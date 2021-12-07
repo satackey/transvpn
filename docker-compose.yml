@@ -1,0 +1,47 @@
+# https://stackoverflow.com/a/69055795
+
+services:
+  vpnserver:
+    build: vpnserver
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      internet:
+      vpnserver-transproxy-internal:
+    depends_on:
+      - transproxy
+    command: >-
+      sh -xc "
+      ip route &&
+      ip route del default &&
+      ip route add default via `dig transproxy +short`
+      "
+
+  transproxy:
+    build: transproxy
+    environment:
+      - http_proxy=http://httpproxy:3128
+      - https_proxy=http://httpproxy:3128
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+      # - net.ipv4.tcp_timestamps=0
+      - net.ipv4.conf.default.send_redirects=0
+      - net.ipv4.conf.all.send_redirects=0
+    networks:
+      vpnserver-transproxy-internal:
+      transproxy-httpproxy-internal:
+
+  httpproxy:
+    image: sameersbn/squid:3.3.8-23
+    networks:
+      transproxy-httpproxy-internal:
+
+networks:
+  vpnserver-transproxy-internal:
+  transproxy-httpproxy-internal:
+  internet:
